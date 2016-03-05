@@ -3,8 +3,9 @@
 """程序片函数运行时间测量模块
 usage:
     from timer import howlongitrun
-    ...
-    with Timer():
+
+    @howlongitrun
+    def func(*args, **kwargs):
         ...
 """
 import gc

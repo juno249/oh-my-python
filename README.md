@@ -1,2 +1,2 @@
 ### oh-my-python
-oh-my-python contains some python script that I picked up.
+oh-my-python是在工作和学习中积累的一些python script
