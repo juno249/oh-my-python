@@ -4,7 +4,7 @@
 2. 尽可能的使用扩展实现而不是自己造轮子。
 
 ###some useful flask-plugin
-1. Flask-Script
+##### Flask-Script
 Flask-Script 是一个 Flask 扩展,为 Flask 程序添加了一个命令行解析器。Flask-Script 自带了一组常用选项,而且还支持自定义命令。
 安装
 ```
@@ -20,13 +20,13 @@ manager = Manager(app)
 if __name__ == '__main__':
 manager.run()
 ```
-2. Flask-SQLAlchemy
+##### Flask-SQLAlchemy
 Flask-SQLAlchemy 是一个 Flask 扩展,简化了在 Flask 程序中使用 SQLAlchemy 的操作。SQLAlchemy 是一个很强大的关系型数据库框架,支持多种数据库后台。SQLAlchemy 提供了高层 ORM,也提供了使用数据库原生 SQL 的低层功能。
 安装
 ```
 pip install flask-sqlalchemy
 ```
-3. Flask-Migrate
+##### Flask-Migrate
 SQLAlchemy的主力开发人员编写了一个迁移框架,称为 [Alembic](https://alembic.readthedocs)。除了直接使用Alembic之 外,Flask程序还可使用[Flask-Migrate](http://flask-migrate.readthedocs.org/en/latest/)扩展。这个扩展对 Alembic 做了轻量级包装,并集成到 Flask-Script 中,所有操作都通过 Flask-Script 命令完成。
 安装
 ```
@@ -39,8 +39,67 @@ from flask.ext.migrate import Migrate, MigrateCommand
 migrate = Migrate(app, db)
 manager.add_command('db', MigrateCommand)
 ```
-4. Flask-Email
+##### Flask-Email
+##### Werkzeug
+Werkzeug 中的 security 模块能够很方便地实现密码散列值的计算。这一功能的实现只需要两个函数,分别用在注册用户和验证用户阶段。
+generate_password_hash(password, method= pbkdf2:sha1 , salt_length=8) :这个函数将原始密码作为输入,以字符串形式输出密码的散列值,输出的值可保存在用户数据库中。
+method 和 salt_length 的默认值就能满足大多数需求。check_password_hash(hash, password) :这个函数的参数是从数据库中取回的密码散列值和用户输入的密码。返回值为 True 表明密码正确。
+example
+```python
+# coding: utf-8
+# app/models.py
+from werkzeug.security import generate_password_hash, check_password_hash
+class User(db.Model):
+	# ...
+	password_hash = db.Column(db.String(128))
+    
+	@property
+	def password(self):
+		raise AttributeError('password is not a readable attribute')
 
-### 大型项目结构
-1. 配置选项
-程序经常需要设定多个配置。这方面最好的例子就是开发、测试和生产环境要使用不同的数据库,这样才不会彼此影响。
+	@password.setter
+	def password(self, password):
+		self.password_hash = generate_password_hash(password)
+        
+	def verify_password(self, password):
+		return check_password_hash(self.password_hash, password)
+```
+##### Flask-Login
+用户登录程序后,他们的认证状态要被记录下来,这样浏览不同的页面时才能记住这个状态。Flask-Login 是个非常有用的小型扩展,专门用来管理用户认证系统中的认证状态,且不依赖特定的认证机制
+install
+```
+pip install flask-login
+```
+example
+```python
+# coding: utf-8
+# app/models.py
+
+from flask.ext.login import UserMixin
+
+class User(UserMixin, db.Model):
+	__tablename__ = 'users'
+	id = db.Column(db.Integer, primary_key = True)
+	email = db.Column(db.String(64), unique=True, index=True)
+	username = db.Column(db.String(64), unique=True, index=True)
+	password_hash = db.Column(db.String(128))
+	role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+```
+
+```python
+# coding: utf-8
+# app/__init__.py
+from flask.ext.login import LoginManager
+l
+ogin_manager = LoginManager()
+login_manager.session_protection = 'strong'
+login_manager.login_view = 'auth.login'
+
+def create_app(config_name):
+	# ...
+	login_manager.init_app(app)
+```
+##### itsdangerous
+itsdangerous 提供了多种生成令牌的方法。其中, TimedJSONWebSignatureSerializer 类生成具有过期时间的 JSON Web 签名(JSON Web Signatures,JWS)。这个类的构造函数接收的参数是一个密钥,在 Flask 程序中可使用 SECRET_KEY 设置。
+dumps() 方法为指定的数据生成一个加密签名,然后再对数据和签名进行序列化,生成令牌字符串。 expires_in 参数设置令牌的过期时间,单位为秒。
+为了解码令牌,序列化对象提供了 loads() 方法,其唯一的参数是令牌字符串。这个方法会检验签名和过期时间,如果通过,返回原始数据。如果提供给 loads() 方法的令牌不正确或过期了,则抛出异常。
