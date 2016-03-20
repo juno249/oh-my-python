@@ -90,8 +90,8 @@ class User(UserMixin, db.Model):
 # coding: utf-8
 # app/__init__.py
 from flask.ext.login import LoginManager
-l
-ogin_manager = LoginManager()
+
+login_manager = LoginManager()
 login_manager.session_protection = 'strong'
 login_manager.login_view = 'auth.login'
 
@@ -103,3 +103,15 @@ def create_app(config_name):
 itsdangerous 提供了多种生成令牌的方法。其中, TimedJSONWebSignatureSerializer 类生成具有过期时间的 JSON Web 签名(JSON Web Signatures,JWS)。这个类的构造函数接收的参数是一个密钥,在 Flask 程序中可使用 SECRET_KEY 设置。
 dumps() 方法为指定的数据生成一个加密签名,然后再对数据和签名进行序列化,生成令牌字符串。 expires_in 参数设置令牌的过期时间,单位为秒。
 为了解码令牌,序列化对象提供了 loads() 方法,其唯一的参数是令牌字符串。这个方法会检验签名和过期时间,如果通过,返回原始数据。如果提供给 loads() 方法的令牌不正确或过期了,则抛出异常。
+
+##### forgerypy
+用来生成虚拟数据.
+##### Flask-HTTPAuth
+因为 REST 架构基于 HTTP 协议,所以发送密令的最佳方式是使用 HTTP 认证,基本认证和摘要认证都可以。在 HTTP 认证中,用户密令包含在请求的 Authorization 首部中。
+HTTP 认证协议很简单,可以直接实现,不过 Flask-HTTPAuth 扩展提供了一个便利的包装,可以把协议的细节隐藏在修饰器之中,类似于 Flask-Login 提供的 login_required 修饰器。
+
+##### for TEXT
+PageDown:使用 JavaScript 实现的客户端 Markdown 到 HTML 的转换程序。
+Flask-PageDown:为 Flask 包装的 PageDown,把 PageDown 集成到 Flask-WTF 表单中。
+Markdown:使用 Python 实现的服务器端 Markdown 到 HTML 的转换程序。
+Bleach:使用 Python 实现的 HTML 清理器。
