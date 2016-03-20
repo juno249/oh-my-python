@@ -6,26 +6,21 @@ from datetime import datetime
 from sample.celery import app
 
 
-@app.task
+@app.task(name='sample.tasks.add')
 def add(x, y):
     result = x+y
-    with open('/tmp/add', 'w') as outfile:
-        outfile.write('process result: %s' % str(result))
+    logging.info('add result %s', str(result))
     return result
 
 
-@app.task
+@app.task(name='sample.tasks.minus')
 def minus(x, y):
     result = x - y
-    with open('/tmp/minus', 'w') as outfile:
-        outfile.write('process result: %s' % str(result))
-    logging.info('minus result %d', result)
+    logging.info('minus result %s', str(result))
     return result
 
 
-@app.task
+@app.task(name='sample.tasks.remind')
 def remind():
     current = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    with open('/tmp/remind', 'w') as outfile:
-        outfile.write('now : %s' % current)
     logging.info('now: %s', current)
