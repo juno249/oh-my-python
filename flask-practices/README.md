@@ -109,9 +109,64 @@ dumps() 方法为指定的数据生成一个加密签名,然后再对数据和�
 ##### Flask-HTTPAuth
 因为 REST 架构基于 HTTP 协议,所以发送密令的最佳方式是使用 HTTP 认证,基本认证和摘要认证都可以。在 HTTP 认证中,用户密令包含在请求的 Authorization 首部中。
 HTTP 认证协议很简单,可以直接实现,不过 Flask-HTTPAuth 扩展提供了一个便利的包装,可以把协议的细节隐藏在修饰器之中,类似于 Flask-Login 提供的 login_required 修饰器。
-
+##### Flask-SSLify
+让程序拦截发往 http:// 的请求,重定向到https://, 一操作可使用 Flask-SSLify 扩展完成。
+```python
+def create_app(config_name):
+	# ...
+	if not app.debug and not app.testing and not app.config['SSL_DISABLE']:
+		from flask.ext.sslify import SSLify
+		sslify = SSLify(app)
+# ...
+```
 ##### for TEXT
 PageDown:使用 JavaScript 实现的客户端 Markdown 到 HTML 的转换程序。
 Flask-PageDown:为 Flask 包装的 PageDown,把 PageDown 集成到 Flask-WTF 表单中。
 Markdown:使用 Python 实现的服务器端 Markdown 到 HTML 的转换程序。
 Bleach:使用 Python 实现的 HTML 清理器。
+
+#### Testing
+Python 提供了一个优秀的代码覆盖工具,称为 coverage,你可以使用 pip 进行安装:
+```
+pip install coverage
+```
+test with flask app client, and test with selenium.
+
+#### 性能
+##### 记录影响性能的缓慢数据库查询
+Flask-SQLAlchemy
+提供了一个选项,可以记录请求中执行的与数据库查询相关的统计数字。在示例 16-1 中,我们可以看到如何使用这个功能把慢于设定阈值的查询写入日志。
+![图一](images/pic1.png)
+![图二](images/pic2.png)
+![图三](images/pic3.png)
+#### 分析源码
+性能问题的另一个可能诱因是高 CPU 消耗,由执行大量运算的函数导致。源码分析器能找出程序中执行最慢的部分。分析器监视运行中的程序,记录调用的函数以及运行各函数所消耗的时间,然后生成一份详细的报告,指出运行最慢的函数。
+Flask 使用的开发 Web 服务器由 Werkzeug 提供,可根据需要为每条请求启用 Python 分析器。示例 16-3 向程序中添加了一个新命令,用来启动分析器。
+```python
+# coding: utf-8
+# manage.py
+@manager.command
+def profile(length=25, profile_dir=None):
+	"""Start the application under the code profiler."""
+	from werkzeug.contrib.profiler import ProfilerMiddleware
+	app.wsgi_app = ProfilerMiddleware(app.wsgi_app, restrictions=[length],
+	profile_dir=profile_dir)
+	app.run()
+```
+#### 部署
+##### nginx+supervisor+gunicorn
+##### 配置日志
+```python
+# coding: utf-8
+# config.py
+class UnixConfig(ProductionConfig):
+	@classmethod
+	def init_app(cls, app):
+		ProductionConfig.init_app(app)
+		# 写入系统日志
+		import logging
+		from logging.handlers import SysLogHandler
+		syslog_handler = SysLogHandler()
+		syslog_handler.setLevel(logging.WARNING)
+		app.logger.addHandler(syslog_handler)
+```
