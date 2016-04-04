@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """一个基于PyCurl多线程的下载模块
+Usage:
+    from fast_curl import fast_curl
+    fast_curl(url, filename)
 """
 import os
-import sys
 import time
 import shutil
 import logging
@@ -14,6 +16,14 @@ import requests
 
 
 class Worker(Thread):
+    """下载数据分块的工作线程
+    Attributes:
+        name: 线程名
+        url: 下载链接
+        file: 保存的文件名
+        ranges: ranges tuple，(beg_bytes, end_bytes)
+        downloaded: 已经下载的字节数
+    """
 
     def __init__(self, thread_name, url, filename, ranges, config={}):
         super(Worker, self).__init__()
@@ -24,6 +34,14 @@ class Worker(Thread):
         self.downloaded = 0
         self.config = {}
         self.config.update(config)
+        self.curl = pycurl.Curl()
+        self.curl.setopt(pycurl.URL, url)
+        self.curl.setopt(pycurl.MAXREDIRS, 5)
+        self.curl.setopt(pycurl.FOLLOWLOCATION, True)
+        # 下载连接的时间，假如网速慢且文件大，应该延长TIMEOUT时间
+        self.curl.setopt(pycurl.TIMEOUT, 1200)
+        self.curl.setopt(pycurl.CONNECTTIMEOUT, 120)
+        self.curl.setopt(pycurl.NOSIGNAL, True)
 
     def progress(self, total, existing, upload_t, upload_d):
         self.downloaded = existing
@@ -45,23 +63,22 @@ class Worker(Thread):
         logging.info('task {} will download from {} to  {}'.format(self.name,
                      self.startpoint, self.ranges[1]))
 
-        curl = get_base_curl(self.url)
-        curl.setopt(pycurl.WRITEFUNCTION, file_buffer.write)
+        self.curl.setopt(pycurl.WRITEFUNCTION, file_buffer.write)
 
         # 设置Range不在头部设置
         down_range = '{}-{}'.format(int(self.startpoint), int(self.ranges[1]))
-        curl.setopt(pycurl.RANGE, down_range)
-        curl.setopt(pycurl.NOPROGRESS, False)
-        curl.setopt(pycurl.PROGRESSFUNCTION, self.progress)
+        self.curl.setopt(pycurl.RANGE, down_range)
+        self.curl.setopt(pycurl.NOPROGRESS, False)
+        self.curl.setopt(pycurl.PROGRESSFUNCTION, self.progress)
         try:
-            curl.perform()
+            self.curl.perform()
         except Exception as err:
             track = traceback.format_exc()
             msg = '%s\n%s' % (err, track)
             logging.error(msg)
             return -1
         finally:
-            curl.close()
+            self.curl.close()
             file_buffer.close()
         interval = time.time() - start
         logging.info('thread_{} finish download Range:{}-{}, takes {}s'.format(
@@ -69,26 +86,18 @@ class Worker(Thread):
         return 0
 
 
-def get_base_curl(url):
-    curl = pycurl.Curl()
-    curl.setopt(pycurl.URL, url)
-    curl.setopt(pycurl.MAXREDIRS, 5)
-    curl.setopt(pycurl.FOLLOWLOCATION, True)
-    curl.setopt(pycurl.TIMEOUT, 1200)
-    curl.setopt(pycurl.CONNECTTIMEOUT, 1200)
-    curl.setopt(pycurl.NOSIGNAL, True)
-    return curl
-
-
-def get_total_size(url, valid_type=None):
-    """获取要下载的文件的大小及格式
+def get_total_size(url):
+    """获取要下载的文件大小
+    Args:
+        url: 下载链接
+    Return:
+        length: 文件大小, bytes
     """
-    r = requests.head(url, allow_redirects=True)
-    total_size = int(r.headers.get('Content-Length', 0))
-    ctype = r.headers.get('Content-Type', '')
-    media_type = ctype.split('/')[0]
-    if not media_type or media_type not in valid_type:
-        total_size = 0
+    resp = requests.head(url, allow_redirects=True)
+    total_size = int(resp.headers.get('Content-Length', 0))
+    # http = httplib2.Http()
+    # response, _ = http.request(url, 'HEAD')
+    # total_size = int(response.get('content-length', 0))
     return total_size
 
 
@@ -108,23 +117,10 @@ def is_live(tasks):
     return False
 
 
-def cal_suitable_blocks(size):
-    """根据下载的大小计算分成几块
-    """
-    size_500m = 524288000
-    min_count = 5
-    max_count = 10
-    if size < size_500m:
-        return min_count
-    return max_count
-
-
-def fast_curl(url, output, blocks=None, config={}):
+def fast_curl(url, output, blocks=5, config={}):
     start_time = time.time()
-    total_size = get_total_size(url, valid_type=('video',))
+    total_size = get_total_size(url)
 
-    if blocks is None:
-        blocks = cal_suitable_blocks(total_size)
     ranges = split_blocks(total_size, blocks)
 
     if total_size <= 0:
@@ -171,3 +167,31 @@ def fast_curl(url, output, blocks=None, config={}):
     logging.info('[Download {0} takes {1:.2f}s, speed: {2:.2f}KB/s] {3:.2f}MB'
                  .format(url, interval, speed, total_size/1048576.0))
     return 0
+
+
+def main():
+    import sys
+    import logging
+    from urlparse import urlparse
+    logging.basicConfig(level=logging.DEBUG,
+                        format="%(asctime)s %(levelname)s# %(message)s",
+                        datefmt="%Y/%m/%d-%H:%M:%S")
+    argv = sys.argv
+    if len(argv) == 2:
+        url = argv[1]
+        urlpath = urlparse(url).path
+        filename = os.path.basename(urlpath)
+        fast_curl(url, filename)
+    elif len(argv) == 3:
+        url, filename = argv[1], argv[2]
+        fast_curl(url, filename)
+    elif len(argv) == 4:
+        url, filename, blocks = argv[1], argv[2], int(argv[3])
+        fast_curl(url, filename, blocks)
+    else:
+        print "python fast_curl url [filename] [blocks]"
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
