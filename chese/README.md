@@ -20,6 +20,6 @@ pip install -r requirements.txt
 
 ##### EXAMPLE
 1. flask hello-world
-![flask](!flask.png)
+![flask](https://github.com/wongxinjie/oh-my-python/blob/master/chese/flask.png)
 2. bottle hello-world
-![bottle](!bottle.png)
+![bottle](https://github.com/wongxinjie/oh-my-python/blob/master/chese/bottle.png)
